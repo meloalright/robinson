@@ -15,7 +15,6 @@ pub enum NodeType {
     Element(ElementData),
 }
 
-
 #[derive(Debug)]
 pub struct ElementData {
     tag_name: String,

@@ -1,5 +1,5 @@
-use std::collections::{HashMap};
 use super::dom;
+use std::collections::HashMap;
 
 struct Parser {
     pos: usize, // "usize" is an unsigned integer, similar to "size_t" in C
@@ -14,7 +14,7 @@ impl Parser {
 
     // Do the next characters start with the given string?
     fn starts_with(&self, s: &str) -> bool {
-        self.input[self.pos ..].starts_with(s)
+        self.input[self.pos..].starts_with(s)
     }
 
     // If the exact string `s` is found at the current position, consume it.
@@ -139,7 +139,11 @@ impl Parser {
 
 // Parse an HTML document and return the root element.
 pub fn parse(source: String) -> dom::Node {
-    let mut nodes = Parser { pos: 0, input: source }.parse_nodes();
+    let mut nodes = Parser {
+        pos: 0,
+        input: source,
+    }
+    .parse_nodes();
 
     // If the document contains a root element, just return it. Otherwise, create one.
     if nodes.len() == 1 {
@@ -149,7 +153,6 @@ pub fn parse(source: String) -> dom::Node {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,7 +160,9 @@ mod tests {
 
     #[test]
     fn html_works() {
-        let node = parse("<div><span>Hello</span><span>World</span><p>Hello Every One.</p></div>".to_string());
+        let node = parse(
+            "<div><span>Hello</span><span>World</span><p>Hello Every One.</p></div>".to_string(),
+        );
         println!("{:?}", node)
     }
 }
