@@ -3,10 +3,10 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Node {
     // data common to all nodes:
-    children: Vec<Node>,
+    pub(crate) children: Vec<Node>,
 
     // data specific to each node type:
-    node_type: NodeType,
+    pub(crate) node_type: NodeType,
 }
 
 #[derive(Debug)]
@@ -17,8 +17,8 @@ pub enum NodeType {
 
 #[derive(Debug)]
 pub struct ElementData {
-    tag_name: String,
-    attrs: AttrMap,
+    pub(crate) tag_name: String,
+    pub(crate) attrs: AttrMap,
 }
 
 pub type AttrMap = HashMap<String, String>;
