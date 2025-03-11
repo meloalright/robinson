@@ -4,50 +4,50 @@ use super::style::*;
 // CSS box model. All sizes are in px.
 
 #[derive(Clone, Copy, Default, Debug)]
-struct Dimensions {
+pub struct Dimensions {
     // Position of the content area relative to the document origin:
-    content: Rect,
+    pub(crate) content: Rect,
 
     // Surrounding edges:
-    padding: EdgeSizes,
-    border: EdgeSizes,
-    margin: EdgeSizes,
+    pub(crate) padding: EdgeSizes,
+    pub(crate) border: EdgeSizes,
+    pub(crate) margin: EdgeSizes,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
-struct Rect {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
+pub struct Rect {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) width: f32,
+    pub(crate) height: f32,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
-struct EdgeSizes {
-    left: f32,
-    right: f32,
-    top: f32,
-    bottom: f32,
+pub struct EdgeSizes {
+    pub(crate) left: f32,
+    pub(crate) right: f32,
+    pub(crate) top: f32,
+    pub(crate) bottom: f32,
 }
 
 #[derive(Clone, Debug)]
-struct LayoutBox<'a> {
-    dimensions: Dimensions,
-    box_type: BoxType<'a>,
-    children: Vec<LayoutBox<'a>>,
+pub struct LayoutBox<'a> {
+    pub(crate) dimensions: Dimensions,
+    pub(crate) box_type: BoxType<'a>,
+    pub(crate) children: Vec<LayoutBox<'a>>,
 }
 
 impl Dimensions {
     // The area covered by the content area plus its padding.
-    fn padding_box(self) -> Rect {
+    pub fn padding_box(self) -> Rect {
         self.content.expanded_by(self.padding)
     }
     // The area covered by the content area plus padding and borders.
-    fn border_box(self) -> Rect {
+    pub fn border_box(self) -> Rect {
         self.padding_box().expanded_by(self.border.clone())
     }
     // The area covered by the content area plus padding, borders, and margin.
-    fn margin_box(self) -> Rect {
+    pub fn margin_box(self) -> Rect {
         self.border_box().expanded_by(self.margin)
     }
 }
@@ -64,7 +64,7 @@ impl Rect {
 }
 
 #[derive(Debug, Clone)]
-enum BoxType<'a> {
+pub enum BoxType<'a> {
     BlockNode(&'a StyledNode<'a>),
     InlineNode(&'a StyledNode<'a>),
     AnonymousBlock,
@@ -77,7 +77,7 @@ enum Display {
 
 impl<'a> StyledNode<'a> {
     // Return the specified value of a property if it exists, otherwise `None`.
-    fn value(&self, name: &str) -> Option<Value> {
+    pub fn value(&self, name: &str) -> Option<Value> {
         self.specified_values.get(name).map(|v| v.clone())
     }
     /// Return the specified value of property `name`, or property `fallback_name` if that doesn't
@@ -101,7 +101,7 @@ impl<'a> StyledNode<'a> {
 }
 
 // Build the tree of LayoutBoxes, but don't perform any layout calculations yet.
-fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>) -> LayoutBox<'a> {
+pub fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>) -> LayoutBox<'a> {
     // Create the root box.
     let mut root = LayoutBox::new(match style_node.display() {
         Display::Block => BoxType::BlockNode(style_node),
@@ -142,7 +142,7 @@ impl<'a> LayoutBox<'a> {
     // ...
 
     // Lay out a box and its descendants.
-    fn layout(&mut self, containing_block: Dimensions) {
+    pub fn layout(&mut self, containing_block: Dimensions) {
         match self.box_type.clone() {
             BoxType::BlockNode(_) => self.layout_block(containing_block),
             BoxType::InlineNode(_) => {}  // TODO
