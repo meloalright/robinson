@@ -153,6 +153,7 @@ impl<'a> LayoutBox<'a> {
     fn layout_block(&mut self, containing_block: Dimensions) {
         // Child width can depend on parent width, so we need to calculate
         // this box's width before laying out its children.
+        // if no specific style width will `Auto by container limit``
         self.calculate_block_width(containing_block);
 
         // Determine where the box is located within its container.
@@ -331,6 +332,54 @@ impl<'a> LayoutBox<'a> {
         }
     }
     // ...
+}
+
+impl<'a> LayoutBox<'a> {
+    fn layout_measure_inline(&mut self) {
+        // calculate measure width and height never limit by context (but if work-break=break-all need to limit and split insert to new line)
+
+        // calculate position
+
+        // (no children)
+
+        // (no specific width height)
+    }
+}
+
+
+
+impl<'a> LayoutBox<'a> {
+    fn layout_inline_block(&mut self) {
+        // calculate inline_block width (all inline_block children has only block or anonymous block children (b/an) so it line by line
+        // and so it width if no specific style will be `Auto by vertical children`
+        // so do height
+
+        // calculate position
+
+        // Recursively lay out the children of this box.
+
+        // Parent width and height can all depends on child height
+        // width is easy because of all the limit max is extended from context
+        // height is same to block as well (**in fact
+        // all the inline-block or block (ib/b) element has only block or anonymous block (b/an) children
+        // because the inline children will be filled into anonymous block as well**)
+        // must be called *after* the children are laid out.
+    }
+}
+
+
+
+impl<'a> LayoutBox<'a> {
+    fn layout_anonymous_block(&mut self) {
+        // (all anonymous block has only (i/ib) children so anonymous width height should all be `Auto by horizontal children but limit by context` but take whole line)
+
+        // Calculate position (left top)
+
+        // Recursively lay out the children (i/ib) of this anonymouse and fill into anonymous content width and height
+
+        // Parent width + height can depend on child height, so `calculate_height_and_width`
+        // must be called *after* the children are laid out.
+    }
 }
 
 fn sum<I>(iter: I) -> f32
