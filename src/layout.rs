@@ -305,6 +305,10 @@ impl<'a> LayoutBox<'a> {
         }
     }
 
+    fn fill_block_width(&mut self) {
+        todo!()
+    }
+
     fn calculate_block_height(&mut self) {
         // If the height is set to an explicit length, use that exact length.
         // Otherwise, just keep the value set by `layout_block_children`.
@@ -346,40 +350,66 @@ impl<'a> LayoutBox<'a> {
     }
 }
 
+impl<'a> LayoutBox<'a> {
+    fn layout_anonymous_block(&mut self) {}
 
+    fn calculate_anonymous_block_width(&mut self, containing_block: Dimensions) {}
+
+    fn calculate_anonymous_block_position(&mut self, containing_block: Dimensions) {}
+
+    fn calculate_anonymous_block_height(&mut self, containing_block: Dimensions) {}
+
+    fn fill_anonymous_block_width(&mut self) {}
+}
 
 impl<'a> LayoutBox<'a> {
-    fn layout_inline_block(&mut self) {
-        // calculate inline_block width (all inline_block children has only block or anonymous block children (b/an) so it line by line
-        // and so it width if no specific style will be `Auto by vertical children`
-        // so do height
+    fn layout_line(&mut self, containing_block: Dimensions) {}
 
-        // calculate position
+    fn layout_line_width(&mut self, containing_block: Dimensions) {}
 
-        // Recursively lay out the children of this box.
+    fn layout_line_top_left(&mut self, containing_block: Dimensions) {}
 
-        // Parent width and height can all depends on child height
-        // width is easy because of all the limit max is extended from context
-        // height is same to block as well (**in fact
-        // all the inline-block or block (ib/b) element has only block or anonymous block (b/an) children
-        // because the inline children will be filled into anonymous block as well**)
-        // must be called *after* the children are laid out.
+    fn layout_line_children(&mut self) {}
+
+    fn layout_line_final_width(&mut self) {}
+
+    fn fill_line_height(&mut self) {}
+}
+
+impl<'a> LayoutBox<'a> {
+    fn layout_inline_run_block(&mut self, containing_block: Dimensions) {
+        self.measure_inline_run_width(containing_block);
+        self.calculate_inline_run_position(containing_block);
+        self.resolve_final_width_and_line_context(containing_block);
+    }
+
+    fn measure_inline_run_width(&mut self, containing_block: Dimensions) {
+        todo!()
+    }
+
+    fn calculate_inline_run_position(&mut self, containing_block: Dimensions) {
+        todo!()
+    }
+
+    fn resolve_final_width_and_line_context(&mut self, containing_block: Dimensions) {
+        todo!()
+    }
+
+    fn fix_top(&mut self) {
+        todo!()
     }
 }
 
-
-
 impl<'a> LayoutBox<'a> {
-    fn layout_anonymous_block(&mut self) {
-        // (all anonymous block has only (i/ib) children so anonymous width height should all be `Auto by horizontal children but limit by context` but take whole line)
+    fn layout_inline_block(&mut self, containing_block: Dimensions) {}
 
-        // Calculate position (left top)
+    fn layout_inline_block_width(&mut self, containing_block: Dimensions) {}
 
-        // Recursively lay out the children (i/ib) of this anonymouse and fill into anonymous content width and height
+    fn layout_inline_block_position(&mut self, containing_block: Dimensions) {}
 
-        // Parent width + height can depend on child height, so `calculate_height_and_width`
-        // must be called *after* the children are laid out.
-    }
+    fn layout_inline_block_children(&mut self) {}
+
+    fn fill_line_block_width_and_fix_top(&mut self) {}
 }
 
 fn sum<I>(iter: I) -> f32

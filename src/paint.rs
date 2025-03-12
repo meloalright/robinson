@@ -159,8 +159,8 @@ mod tests {
     use super::*;
 
     extern crate image;
-    use std::io::{Read, BufWriter};
     use std::fs::File;
+    use std::io::{BufWriter, Read};
 
     #[test]
     fn test_rasterization() {
@@ -203,7 +203,15 @@ mod tests {
 
         layout_tree.layout(dimension);
 
-        let canvas = paint(&layout_tree, Rect { x: 0., y: 0., width: 1000., height: 1000. });
+        let canvas = paint(
+            &layout_tree,
+            Rect {
+                x: 0.,
+                y: 0.,
+                width: 1000.,
+                height: 1000.,
+            },
+        );
         let (w, h) = (canvas.width as u32, canvas.height as u32);
 
         let img = image::ImageBuffer::from_fn(w, h, move |x, y| {
