@@ -16,3 +16,7 @@
 | anonymous block | width -> (empty auto)                                              | recursive -> horizontal(inline run, inline block)           | width -> (auto by children sum but limit by context) | height -> lines Σ (max by children) | /                                         | top -> child-baseline(inline run, inline-block)   |
 | inline run     | measurable (width, height)                                         | /                                       | /                                      | /                             | /                                         | /                                                 |
 | inline-block   | measurable (width calc from container, height calc from container)  | recursive -> vertical(block, anonymous block) | height -> (specific, auto by children sum) | width -> (specific, max by children) | width -> block (empty auto -> fill one line) | left -> child-leading(block, anonymous block)      |
+
+* inline -> into anonymous block (build_layout_tree)
+
+* word segment and soft wrap opportunity break (layout)
