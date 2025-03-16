@@ -222,4 +222,65 @@ mod tests {
         let mut file = BufWriter::new(File::create("output.png").unwrap());
         image::DynamicImage::ImageRgba8(img).write_to(&mut file, image::ImageFormat::Png);
     }
+    #[test]
+    fn test_rasterization2() {
+        let root = html::parse(
+            "<div><div class=\"a\">
+  <div class=\"b\">
+    <div class=\"c\">
+      <div class=\"d\">
+        <div class=\"e\">
+          <div class=\"f\">
+            <div class=\"g\">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>"
+                .to_string(),
+        );
+        let css = css::parse(
+            "* { display: block; padding: 12px; }
+.a { background: #ff0000; }
+.b { background: #ffa500; }
+.c { background: #ffff00; }
+.d { background: #008000; }
+.e { background: #0000ff; }
+.f { background: #4b0082; }
+.g { background: #800080; }"
+                .to_owned(),
+        );
+
+        let styled_tree = style_tree(&root, &css);
+
+        let mut layout_tree = build_layout_tree(&styled_tree);
+
+        let mut dimension = Dimensions::default();
+
+        dimension.content.width = 800.0;
+
+        layout_tree.layout2(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
+        layout_tree.calc_position();
+
+        let canvas = paint(
+            &layout_tree,
+            Rect {
+                x: 0.,
+                y: 0.,
+                width: 1000.,
+                height: 1000.,
+            },
+        );
+        let (w, h) = (canvas.width as u32, canvas.height as u32);
+
+        let img = image::ImageBuffer::from_fn(w, h, move |x, y| {
+            let color = canvas.pixels[(y * w + x) as usize];
+            image::Rgba([color.r, color.g, color.b, color.a])
+        });
+
+        let mut file = BufWriter::new(File::create("output2.png").unwrap());
+        image::DynamicImage::ImageRgba8(img).write_to(&mut file, image::ImageFormat::Png);
+    }
 }
