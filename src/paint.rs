@@ -197,10 +197,6 @@ mod tests {
 
         let mut layout_tree = build_layout_tree(&styled_tree);
 
-        let mut dimension = Dimensions::default();
-
-        dimension.content.width = 800.0;
-
         layout_tree.layout2(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
         layout_tree.calc_abs();
 
