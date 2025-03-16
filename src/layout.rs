@@ -7,12 +7,47 @@ use super::style::*;
 pub struct Dimensions {
     // Position of the content area relative to the document origin:
     pub(crate) content: Rect,
+    pub(crate) inner: InnerContent,
 
     // Surrounding edges:
     pub(crate) padding: EdgeSizes,
     pub(crate) border: EdgeSizes,
     pub(crate) margin: EdgeSizes,
+
+    pub(crate) box_offset: BoxOffset,
+    pub(crate) box_abs: BoxAbs,
 }
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct InnerContent {
+    pub(crate) left: f32,
+    pub(crate) top: f32,
+    pub(crate) width: f32,
+    pub(crate) height: f32,
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct BoxOffset {
+    pub(crate) left: f32,
+    pub(crate) top: f32,
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct BoxAbs {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+}
+
+impl Dimensions {
+    pub fn get_left(&self) -> f32 {
+        self.box_offset.left + self.inner.left
+    }
+
+    pub fn get_top(&self) -> f32 {
+        self.box_offset.top + self.inner.top
+    }
+}
+
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Rect {
@@ -38,9 +73,9 @@ pub struct LayoutBox<'a> {
 }
 
 impl Dimensions {
-    // The area covered by the content area plus its padding.
+    // // The area covered by the content area plus its padding.
     pub fn padding_box(self) -> Rect {
-        self.content.expanded_by(self.padding)
+        self.abs_content_box().expanded_by(self.padding)
     }
     // The area covered by the content area plus padding and borders.
     pub fn border_box(self) -> Rect {
@@ -50,6 +85,15 @@ impl Dimensions {
     pub fn margin_box(self) -> Rect {
         self.border_box().expanded_by(self.margin)
     }
+    // The area covered by the content area plus its padding.
+    fn abs_content_box(self) -> Rect {
+        Rect {
+            x: self.box_abs.x,
+            y: self.box_abs.y,
+            width: self.inner.width,
+            height: self.inner.height,
+        }
+    }
 }
 
 impl Rect {
@@ -57,6 +101,17 @@ impl Rect {
         Rect {
             x: self.x - edge.left,
             y: self.y - edge.top,
+            width: self.width + edge.left + edge.right,
+            height: self.height + edge.top + edge.bottom,
+        }
+    }
+}
+
+impl InnerContent {
+    fn expanded_by(self, edge: EdgeSizes) -> InnerContent {
+        InnerContent {
+            left: self.left - edge.left,
+            top: self.top - edge.top,
             width: self.width + edge.left + edge.right,
             height: self.height + edge.top + edge.bottom,
         }
@@ -225,6 +280,7 @@ impl<'a> LayoutBox<'a> {
             };
 
             self.dimensions.content.width = underflow_content;
+            self.dimensions.inner.width = underflow_content;
             self_as_container_width = Value::Length(underflow_content, Unit::Px);
             self_as_context_constraints_width = self_as_container_width.clone();
         } else {
@@ -254,6 +310,7 @@ impl<'a> LayoutBox<'a> {
                     .map(|v| v.to_px()))
                 };
                 self.dimensions.content.width = underflow_content;
+                self.dimensions.inner.width = underflow_content;
                 self_as_container_width = Value::Length(underflow_content, Unit::Px);
                 self_as_context_constraints_width = self_as_container_width.clone();
             } else {
@@ -263,12 +320,8 @@ impl<'a> LayoutBox<'a> {
 
         // position
         {
-            let d = &mut self.dimensions;
-
             // margin, border, and padding have initial value 0.
             let zero = Value::Length(0.0, Unit::Px);
-    
-            // If margin-top or margin-bottom is `auto`, the used value is zero.
 
             let mut margin_left = style.lookup("margin-left", "margin", &zero);
             let mut margin_right = style.lookup("margin-right", "margin", &zero);
@@ -279,81 +332,7 @@ impl<'a> LayoutBox<'a> {
             let padding_left = style.lookup("padding-left", "padding", &zero);
             let padding_right = style.lookup("padding-right", "padding", &zero);
     
-            let total = sum([
-                &margin_left,
-                &margin_right,
-                &border_left,
-                &border_right,
-                &padding_left,
-                &padding_right,
-                &width,
-            ]
-            .iter()
-            .map(|v| v.to_px()));
-    
-            // If width is not auto and the total is wider than the container, treat auto margins as 0.
-            if container_width.is_specific_length() {
-                let container_width = container_width.to_px();
-                if total > container_width {
-                    if margin_left.is_auto() {
-                        margin_left = Value::Length(0.0, Unit::Px);
-                    }
-                    if margin_right.is_auto() {
-                        margin_right = Value::Length(0.0, Unit::Px);
-                    }
-                }
-            }
-    
-            // Adjust used values so that the above sum equals `containing_block.width`.
-            // Each arm of the `match` should increase the total width by exactly `underflow`,
-            // and afterward all values should be absolute lengths in px.
-            if container_width.is_specific_length() {
-                let container_width = container_width.to_px();
-                let underflow = container_width - total;
-
-                match (width.is_auto(), margin_left.is_auto(), margin_right.is_auto()) {
-                    // If the values are overconstrained, calculate margin_right.
-                    (false, false, false) => {
-                        margin_right = Value::Length(margin_right.to_px() + underflow, Unit::Px);
-                    }
-
-                    // If exactly one size is auto, its used value follows from the equality.
-                    (false, false, true) => {
-                        margin_right = Value::Length(underflow, Unit::Px);
-                    }
-                    (false, true, false) => {
-                        margin_left = Value::Length(underflow, Unit::Px);
-                    }
-
-                    // If width is set to auto, any other auto values become 0.
-                    (true, _, _) => {
-                        if margin_left.is_auto() {
-                            margin_left = Value::Length(0.0, Unit::Px);
-                        }
-                        if margin_right.is_auto() {
-                            margin_right = Value::Length(0.0, Unit::Px);
-                        }
-
-                        if underflow >= 0.0 {
-                            // Expand width to fill the underflow.
-                            width = Value::Length(underflow, Unit::Px);
-                        } else {
-                            // Width can't be negative. Adjust the right margin instead.
-                            width = Value::Length(0.0, Unit::Px);
-                            margin_right = Value::Length(margin_right.to_px() + underflow, Unit::Px);
-                        }
-                    }
-
-                    // If margin-left and margin-right are both auto, their used values are equal.
-                    (false, true, true) => {
-                        margin_left = Value::Length(underflow / 2.0, Unit::Px);
-                        margin_right = Value::Length(underflow / 2.0, Unit::Px);
-                    }
-                }
-            }
-    
             let d = &mut self.dimensions;
-            d.content.width = width.to_px();
     
             d.padding.left = padding_left.to_px();
             d.padding.right = padding_right.to_px();
@@ -385,6 +364,10 @@ impl<'a> LayoutBox<'a> {
             d.padding.top = style.lookup("padding-top", "padding", &zero).to_px();
             d.padding.bottom = style.lookup("padding-bottom", "padding", &zero).to_px();
         }
+        {
+            self.dimensions.inner.left = self.dimensions.margin.left + self.dimensions.border.left + self.dimensions.padding.left;
+            self.dimensions.inner.top = self.dimensions.margin.top + self.dimensions.border.top + self.dimensions.padding.top;
+        }
         
 
         // 2. recursive -> vertical(block, anonymous block)
@@ -393,6 +376,7 @@ impl<'a> LayoutBox<'a> {
         for child in &mut self.children {
             child.layout2(self_as_container_width.clone(), self_as_context_constraints_width.clone());
             child.dimensions.content.y = children_sum_height + child.dimensions.margin.top + child.dimensions.border.top + child.dimensions.padding.top;
+            child.dimensions.box_offset.top = children_sum_height;
             children_sum_height += child.dimensions.margin_box().height;
             children_max_width = children_max_width.max(child.dimensions.margin_box().width);
         }
@@ -401,13 +385,16 @@ impl<'a> LayoutBox<'a> {
         let mut height = style.value("height").unwrap_or(Value::Keyword("auto".to_string()));
         if height.is_specific_length() {
             self.dimensions.content.height = height.to_px();
+            self.dimensions.inner.height = height.to_px();
         }
         else if height.is_auto() {
             self.dimensions.content.height = children_sum_height;
+            self.dimensions.inner.height = children_sum_height;
         }
 
         // 4. self cross: width -> (specific, max by children)
         if is_self_no_filled_auto {
+            self.dimensions.content.width = children_max_width;
             self.dimensions.content.width = children_max_width;
         }
 
@@ -449,6 +436,7 @@ impl<'a> LayoutBox<'a> {
         for child in &mut self.children {
             // edge size auto by position block
             child.dimensions.content.x = child.dimensions.margin.left + child.dimensions.border.left + child.dimensions.padding.left;
+            // self.dimensions.box_offset.left; // no margin so to do nothing
         }
 
     }
@@ -458,6 +446,22 @@ impl<'a> LayoutBox<'a> {
             child.dimensions.content.y = self.dimensions.content.y + child.dimensions.content.y;
             child.dimensions.content.x = self.dimensions.content.x + child.dimensions.content.x;
             child.calc_position();
+        }
+    }
+
+    pub fn calc_abs(&mut self) {
+        self.dimensions.box_abs.x = self.dimensions.get_left();
+        self.dimensions.box_abs.y = self.dimensions.get_top();
+        for child in &mut self.children {
+            child.traversal_calc_abs(self.dimensions.box_abs);
+        }
+    }
+
+    pub fn traversal_calc_abs(&mut self, parent_abs: BoxAbs) {
+        self.dimensions.box_abs.x = parent_abs.x + self.dimensions.get_left();
+        self.dimensions.box_abs.y = parent_abs.y + self.dimensions.get_top();
+        for child in &mut self.children {
+            child.traversal_calc_abs(self.dimensions.box_abs);
         }
     }
 
