@@ -36,7 +36,7 @@ fn render_background(list: &mut DisplayList, layout_box: &LayoutBox) {
 // Return the specified color for CSS property `name`, or None if no color was specified.
 fn get_color(layout_box: &LayoutBox, name: &str) -> Option<Color> {
     match layout_box.box_type {
-        BoxType::BlockNode(style) | BoxType::InlineNode(style) => match style.value(name) {
+        BoxType::BlockNode(style) | BoxType::InlineNode(style) | BoxType::InlineBlockNode(style) => match style.value(name) {
             Some(Value::ColorValue(color)) => Some(color),
             _ => None,
         },
@@ -163,7 +163,7 @@ mod tests {
     use std::io::{BufWriter, Read};
 
     #[test]
-    fn test_rasterization() {
+    fn test_block_rasterization() {
         let root = html::parse(
             "<div class=\"a\">
   <div class=\"b\">
@@ -216,7 +216,241 @@ mod tests {
             image::Rgba([color.r, color.g, color.b, color.a])
         });
 
-        let mut file = BufWriter::new(File::create("output2.png").unwrap());
+        let mut file = BufWriter::new(File::create("output-block.png").unwrap());
+        image::DynamicImage::ImageRgba8(img).write_to(&mut file, image::ImageFormat::Png);
+    }
+
+
+    #[test]
+    fn test_inline_rasterization() {
+        let root = html::parse(
+            "<div class=\"a\">
+  <div class=\"b\">
+    <div class=\"c\">
+      <div class=\"d\">
+        <div class=\"e\">
+          <div class=\"f\">
+            <div class=\"g\">
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>"
+                .to_string(),
+        );
+        let css = css::parse(
+            "
+.a { display: block; padding: 12px; background: #ff0000; }
+.b { display: block; padding: 12px; background: #ffa500; }
+.c { display: block; padding: 12px; background: #ffff00; }
+.d { display: block; padding: 12px; background: #008000; }
+.e { display: block; padding: 12px; background: #0000ff; }
+.f { display: block; padding: 12px; background: #4b0082; }
+.g { display: block; padding: 12px; background: #800080; }
+.x { display: inline; measure-width: 130px; measure-height: 30px; background: #ffffff; }
+.y { display: inline; measure-width: 80px; measure-height: 20px; background: #000000; }"
+                .to_owned(),
+        );
+
+        let styled_tree = style_tree(&root, &css);
+
+        let mut layout_tree = build_layout_tree(&styled_tree);
+
+        layout_tree.layout(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
+        layout_tree.calc_abs();
+
+        let canvas = paint(
+            &layout_tree,
+            Rect {
+                x: 0.,
+                y: 0.,
+                width: 1000.,
+                height: 1000.,
+            },
+        );
+        let (w, h) = (canvas.width as u32, canvas.height as u32);
+
+        let img = image::ImageBuffer::from_fn(w, h, move |x, y| {
+            let color = canvas.pixels[(y * w + x) as usize];
+            image::Rgba([color.r, color.g, color.b, color.a])
+        });
+
+        let mut file = BufWriter::new(File::create("output-inline.png").unwrap());
+        image::DynamicImage::ImageRgba8(img).write_to(&mut file, image::ImageFormat::Png);
+    }
+
+
+
+    #[test]
+    fn test_inline_block_rasterization() {
+        let root = html::parse(
+            "<div class=\"a\">
+  <div class=\"b\">
+    <div class=\"c\">
+      <div class=\"d\">
+        <div class=\"e\">
+          <div class=\"f\">
+            <div class=\"g\">
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"z\">
+                    <div class=\"a\">
+                        <div class=\"b\">
+                            <div class=\"c\">
+                                <div class=\"d\"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"z\">
+                    <div class=\"a\">
+                        <div class=\"b\">
+                            <div class=\"c\">
+                                <div class=\"d\">
+                                    <div class=\"x\"></div>
+                                    <div class=\"y\"></div>
+                                    <div class=\"x\"></div>
+                                    <div class=\"y\"></div>
+                                    <div class=\"y\"></div>
+                                    <div class=\"y\"></div>
+                                    <div class=\"z\">
+                                        <div class=\"x\"></div>
+                                        <div class=\"y\"></div>
+                                        <div class=\"x\"></div>
+                                        <div class=\"y\"></div>
+                                        <div class=\"y\"></div>
+                                        <div class=\"y\"></div>
+                                        <div class=\"x\"></div>
+                                        <div class=\"y\"></div>
+                                        <div class=\"x\"></div>
+                                        <div class=\"x\"></div>
+                                        <div class=\"y\"></div>
+                                        <div class=\"x\"></div>
+                                    </div>
+                                    <div class=\"x\"></div>
+                                    <div class=\"x\"></div>
+                                    <div class=\"y\"></div>
+                                    <div class=\"x\"></div>
+                                    <div class=\"y\"></div>
+                                    <div class=\"y\"></div>
+                                    <div class=\"y\"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+                <div class=\"x\"></div>
+                <div class=\"x\"></div>
+                <div class=\"y\"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>"
+                .to_string(),
+        );
+        let css = css::parse(
+            "
+.a { display: block; padding: 12px; background: #ff0000; }
+.b { display: block; padding: 12px; background: #ffa500; }
+.c { display: block; padding: 12px; background: #ffff00; }
+.d { display: block; padding: 12px; background: #008000; }
+.e { display: block; padding: 12px; background: #0000ff; }
+.f { display: block; padding: 12px; background: #4b0082; }
+.g { display: block; padding: 12px; background: #800080; }
+.x { display: inline; measure-width: 130px; measure-height: 30px; background: #ffffff; }
+.y { display: inline; measure-width: 80px; measure-height: 20px; background: #000000; }
+.z { display: inline-block; background: #777777; }"
+                .to_owned(),
+        );
+
+        let styled_tree = style_tree(&root, &css);
+
+        let mut layout_tree = build_layout_tree(&styled_tree);
+
+        layout_tree.layout(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
+        layout_tree.calc_abs();
+
+        let canvas = paint(
+            &layout_tree,
+            Rect {
+                x: 0.,
+                y: 0.,
+                width: 1000.,
+                height: 1000.,
+            },
+        );
+        let (w, h) = (canvas.width as u32, canvas.height as u32);
+
+        let img = image::ImageBuffer::from_fn(w, h, move |x, y| {
+            let color = canvas.pixels[(y * w + x) as usize];
+            image::Rgba([color.r, color.g, color.b, color.a])
+        });
+
+        let mut file = BufWriter::new(File::create("output-inline-block.png").unwrap());
         image::DynamicImage::ImageRgba8(img).write_to(&mut file, image::ImageFormat::Png);
     }
 }

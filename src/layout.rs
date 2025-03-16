@@ -71,6 +71,21 @@ pub struct LayoutBox<'a> {
     pub(crate) children: Vec<LayoutBox<'a>>,
 }
 
+pub enum InlineFormattingContextRun {
+    TextRun(),
+    Atom(),
+}
+
+impl<'a> LayoutBox<'a> {
+    pub fn is_line_breakable() -> bool {
+        todo!()
+    }
+
+    pub fn line_break(underflow_width: f32) -> Vec<InlineFormattingContextRun> {
+        todo!()
+    }
+}
+
 impl Dimensions {
     // // The area covered by the content area plus its padding.
     pub fn padding_box(self) -> Rect {
@@ -109,11 +124,13 @@ impl Rect {
 #[derive(Debug, Clone)]
 pub enum BoxType<'a> {
     BlockNode(&'a StyledNode<'a>),
+    InlineBlockNode(&'a StyledNode<'a>),
     InlineNode(&'a StyledNode<'a>),
     AnonymousBlock,
 }
 enum Display {
     Inline,
+    InlineBlock,
     Block,
     None,
 }
@@ -135,6 +152,7 @@ impl<'a> StyledNode<'a> {
         match self.value("display") {
             Some(Value::Keyword(s)) => match &*s {
                 "block" => Display::Block,
+                "inline-block" => Display::InlineBlock,
                 "none" => Display::None,
                 _ => Display::Inline,
             },
@@ -149,6 +167,7 @@ pub fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>) -> LayoutBox<'a> {
     let mut root = LayoutBox::new(match style_node.display() {
         Display::Block => BoxType::BlockNode(style_node),
         Display::Inline => BoxType::InlineNode(style_node),
+        Display::InlineBlock => BoxType::InlineBlockNode(style_node),
         Display::None => panic!("Root node has display: none."),
     });
 
@@ -157,6 +176,10 @@ pub fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>) -> LayoutBox<'a> {
         match child.display() {
             Display::Block => root.children.push(build_layout_tree(child)),
             Display::Inline => root
+                .get_inline_container()
+                .children
+                .push(build_layout_tree(child)),
+            Display::InlineBlock => root
                 .get_inline_container()
                 .children
                 .push(build_layout_tree(child)),
@@ -195,7 +218,7 @@ impl<'a> LayoutBox<'a> {
 
     fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
-            BoxType::BlockNode(node) | BoxType::InlineNode(node) => node,
+            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::InlineBlockNode(node) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block box has no style node"),
         }
     }
@@ -211,8 +234,9 @@ impl<'a> LayoutBox<'a> {
         // content-box
         match self.box_type.clone() {
             BoxType::BlockNode(_) => self.layout_block(container_width, context_constraints_width),
-            BoxType::InlineNode(_) => {}  // TODO
-            BoxType::AnonymousBlock => {} // TODO
+            BoxType::InlineNode(_) => self.layout_inline(container_width, context_constraints_width),  // TODO
+            BoxType::InlineBlockNode(_) => self.layout_inline_block(container_width, context_constraints_width),  // TODO
+            BoxType::AnonymousBlock => self.layout_anonymous(container_width, context_constraints_width) // TODO
         }
     }
 
@@ -292,16 +316,40 @@ impl<'a> LayoutBox<'a> {
                 self_as_context_constraints_width = self_as_container_width.clone();
             } else {
                 is_self_no_filled_auto = true;
+                let underflow_constraint = context_constraints_width.to_px() - {
+                    let mut margin_left = style.lookup("margin-left", "margin", &zero);
+                    let mut margin_right = style.lookup("margin-right", "margin", &zero);
+            
+                    let border_left = style.lookup("border-left-width", "border-width", &zero);
+                    let border_right = style.lookup("border-right-width", "border-width", &zero);
+            
+                    let padding_left = style.lookup("padding-left", "padding", &zero);
+                    let padding_right = style.lookup("padding-right", "padding", &zero);
+            
+                    sum([
+                        &margin_left,
+                        &margin_right,
+                        &border_left,
+                        &border_right,
+                        &padding_left,
+                        &padding_right,
+                        &width,
+                    ]
+                    .iter()
+                    .map(|v| v.to_px()))
+                };
+                self_as_context_constraints_width = Value::Length(underflow_constraint, Unit::Px);
             }
         }
 
-        // position
+        // inner edge size position
         {
+            let style = self.get_style_node();
             // margin, border, and padding have initial value 0.
             let zero = Value::Length(0.0, Unit::Px);
 
-            let mut margin_left = style.lookup("margin-left", "margin", &zero);
-            let mut margin_right = style.lookup("margin-right", "margin", &zero);
+            let margin_left = style.lookup("margin-left", "margin", &zero);
+            let margin_right = style.lookup("margin-right", "margin", &zero);
     
             let border_left = style.lookup("border-left-width", "border-width", &zero);
             let border_right = style.lookup("border-right-width", "border-width", &zero);
@@ -319,14 +367,6 @@ impl<'a> LayoutBox<'a> {
     
             d.margin.left = margin_left.to_px();
             d.margin.right = margin_right.to_px();
-        }
-        {
-            let style = self.get_style_node();
-            let d = &mut self.dimensions;
-    
-            // margin, border, and padding have initial value 0.
-            let zero = Value::Length(0.0, Unit::Px);
-    
             // If margin-top or margin-bottom is `auto`, the used value is zero.
             d.margin.top = style.lookup("margin-top", "margin", &zero).to_px();
             d.margin.bottom = style.lookup("margin-bottom", "margin", &zero).to_px();
@@ -340,8 +380,6 @@ impl<'a> LayoutBox<'a> {
     
             d.padding.top = style.lookup("padding-top", "padding", &zero).to_px();
             d.padding.bottom = style.lookup("padding-bottom", "padding", &zero).to_px();
-        }
-        {
             self.dimensions.inner.left = self.dimensions.margin.left + self.dimensions.border.left + self.dimensions.padding.left;
             self.dimensions.inner.top = self.dimensions.margin.top + self.dimensions.border.top + self.dimensions.padding.top;
         }
@@ -399,7 +437,7 @@ impl<'a> LayoutBox<'a> {
             self_as_container_width = Value::Length(underflow_content, Unit::Px);
             self_as_context_constraints_width = self_as_container_width.clone();
             for child in &mut self.children {
-                if child.is_width_auto() && !matches!(child.box_type, BoxType::AnonymousBlock) {
+                if !matches!(child.box_type, BoxType::AnonymousBlock) && child.is_width_auto() {
                     // auto and not anonymous -> retake one line
                     child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
                 }
@@ -411,6 +449,281 @@ impl<'a> LayoutBox<'a> {
             // edge size auto by position block
             // self.dimensions.box_offset.left; // no margin so to do nothing
         }
+
+    }
+
+
+    fn layout_anonymous(&mut self, container_width: Value, context_constraints_width: Value) {
+        // 1. width -> (empty auto)
+
+        let self_as_container_width = Value::Keyword("auto".to_string());
+        let self_as_context_constraints_width = context_constraints_width.clone();
+
+        // 2. line break recursive -> horizontal(inline run, inline block)
+
+        // line break into ifc and recursive ifc segments // todo!()
+
+        let mut this_line_children_sum_width = 0f32;
+        let mut this_line_children_max_height = 0f32;
+        let mut computed_lines_sum_height = 0f32;
+        let mut computed_lines_max_width = 0f32;
+
+        let ifc_constraints_width = self_as_context_constraints_width.to_px();
+
+        for child in &mut self.children {
+            child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+            let mut next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
+
+            if next_sum_width > ifc_constraints_width {
+                // wrap
+                computed_lines_sum_height += this_line_children_max_height;
+                computed_lines_max_width = ifc_constraints_width;
+                this_line_children_sum_width = 0f32;
+                this_line_children_max_height = 0f32;
+
+                // 5.top -> child-baseline(inline run, inline-block)
+                // todo!()
+
+                next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
+            }
+
+            // 3. width -> (auto by children sum but limit by context)
+            child.dimensions.box_offset.left = this_line_children_sum_width;
+            // 4. height -> lines Σ (max by children)
+            child.dimensions.box_offset.top = computed_lines_sum_height;
+
+            this_line_children_sum_width = next_sum_width;
+            this_line_children_max_height = this_line_children_max_height.max(child.dimensions.margin_box().height);
+        }
+
+        // final line
+        // 5.top -> child-baseline(inline run, inline-block)
+        // todo!()
+        computed_lines_sum_height += this_line_children_max_height;
+        computed_lines_max_width = computed_lines_max_width.max(this_line_children_sum_width);
+
+        self.dimensions.inner.width = computed_lines_max_width;
+        self.dimensions.inner.height = computed_lines_sum_height;
+
+        drop(this_line_children_max_height);
+        drop(this_line_children_sum_width);
+    }
+
+    pub fn layout_inline(&mut self, container_width: Value, context_constraints_width: Value) {
+        let style = self.get_style_node();
+        let zero = Value::Length(0.0, Unit::Px);
+        let width = style.lookup("measure-width", "ms-width", &zero);
+        let height = style.lookup("measure-height", "ms-height", &zero);
+        self.dimensions.inner.width = width.to_px();
+        self.dimensions.inner.height = height.to_px();
+    }
+
+    pub fn layout_inline_block(&mut self, container_width: Value, context_constraints_width: Value) {
+        // 1. measurable (width calc from container, height calc from container)
+
+        let style = self.get_style_node();
+        let mut width = style.value("width").unwrap_or(Value::Keyword("auto".to_string()));
+
+        let mut self_as_container_width = Value::Keyword("auto".to_string());
+        let mut self_as_context_constraints_width = context_constraints_width.clone();
+
+        let mut is_self_no_filled_auto = false;
+
+        let zero = Value::Length(0.0, Unit::Px);
+
+        if width.is_specific_length() {
+            let specific_width = width.to_px();
+            let underflow_content = specific_width - {
+                let mut margin_left = style.lookup("margin-left", "margin", &zero);
+                let mut margin_right = style.lookup("margin-right", "margin", &zero);
+        
+                let border_left = style.lookup("border-left-width", "border-width", &zero);
+                let border_right = style.lookup("border-right-width", "border-width", &zero);
+        
+                let padding_left = style.lookup("padding-left", "padding", &zero);
+                let padding_right = style.lookup("padding-right", "padding", &zero);
+        
+                sum([
+                    &margin_left,
+                    &margin_right,
+                    &border_left,
+                    &border_right,
+                    &padding_left,
+                    &padding_right,
+                    &width,
+                ]
+                .iter()
+                .map(|v| v.to_px()))
+            };
+
+            self.dimensions.inner.width = underflow_content;
+            self_as_container_width = Value::Length(underflow_content, Unit::Px);
+            self_as_context_constraints_width = self_as_container_width.clone();
+        } else {
+            if container_width.is_specific_length() {
+                let specific_container_width = container_width.to_px();
+
+                let underflow_content = specific_container_width - {
+                    let mut margin_left = style.lookup("margin-left", "margin", &zero);
+                    let mut margin_right = style.lookup("margin-right", "margin", &zero);
+            
+                    let border_left = style.lookup("border-left-width", "border-width", &zero);
+                    let border_right = style.lookup("border-right-width", "border-width", &zero);
+            
+                    let padding_left = style.lookup("padding-left", "padding", &zero);
+                    let padding_right = style.lookup("padding-right", "padding", &zero);
+            
+                    sum([
+                        &margin_left,
+                        &margin_right,
+                        &border_left,
+                        &border_right,
+                        &padding_left,
+                        &padding_right,
+                        &width,
+                    ]
+                    .iter()
+                    .map(|v| v.to_px()))
+                };
+                self.dimensions.inner.width = underflow_content;
+                self_as_container_width = Value::Length(underflow_content, Unit::Px);
+                self_as_context_constraints_width = self_as_container_width.clone();
+            } else {
+                is_self_no_filled_auto = true;
+                let underflow_constraint = context_constraints_width.to_px() - {
+                    let mut margin_left = style.lookup("margin-left", "margin", &zero);
+                    let mut margin_right = style.lookup("margin-right", "margin", &zero);
+            
+                    let border_left = style.lookup("border-left-width", "border-width", &zero);
+                    let border_right = style.lookup("border-right-width", "border-width", &zero);
+            
+                    let padding_left = style.lookup("padding-left", "padding", &zero);
+                    let padding_right = style.lookup("padding-right", "padding", &zero);
+            
+                    sum([
+                        &margin_left,
+                        &margin_right,
+                        &border_left,
+                        &border_right,
+                        &padding_left,
+                        &padding_right,
+                        &width,
+                    ]
+                    .iter()
+                    .map(|v| v.to_px()))
+                };
+                self_as_context_constraints_width = Value::Length(underflow_constraint, Unit::Px);
+            }
+        }
+
+        // inner edge size position
+        {
+            let style = self.get_style_node();
+            // margin, border, and padding have initial value 0.
+            let zero = Value::Length(0.0, Unit::Px);
+
+            let margin_left = style.lookup("margin-left", "margin", &zero);
+            let margin_right = style.lookup("margin-right", "margin", &zero);
+    
+            let border_left = style.lookup("border-left-width", "border-width", &zero);
+            let border_right = style.lookup("border-right-width", "border-width", &zero);
+    
+            let padding_left = style.lookup("padding-left", "padding", &zero);
+            let padding_right = style.lookup("padding-right", "padding", &zero);
+    
+            let d = &mut self.dimensions;
+    
+            d.padding.left = padding_left.to_px();
+            d.padding.right = padding_right.to_px();
+    
+            d.border.left = border_left.to_px();
+            d.border.right = border_right.to_px();
+    
+            d.margin.left = margin_left.to_px();
+            d.margin.right = margin_right.to_px();
+            // If margin-top or margin-bottom is `auto`, the used value is zero.
+            d.margin.top = style.lookup("margin-top", "margin", &zero).to_px();
+            d.margin.bottom = style.lookup("margin-bottom", "margin", &zero).to_px();
+    
+            d.border.top = style
+                .lookup("border-top-width", "border-width", &zero)
+                .to_px();
+            d.border.bottom = style
+                .lookup("border-bottom-width", "border-width", &zero)
+                .to_px();
+    
+            d.padding.top = style.lookup("padding-top", "padding", &zero).to_px();
+            d.padding.bottom = style.lookup("padding-bottom", "padding", &zero).to_px();
+            self.dimensions.inner.left = self.dimensions.margin.left + self.dimensions.border.left + self.dimensions.padding.left;
+            self.dimensions.inner.top = self.dimensions.margin.top + self.dimensions.border.top + self.dimensions.padding.top;
+        }
+        
+
+        // 2. recursive -> vertical(block, anonymous block)
+        let mut children_sum_height = 0f32;
+        let mut children_max_width = 0f32;
+        for child in &mut self.children {
+            child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+            child.dimensions.box_offset.top = children_sum_height;
+            children_sum_height += child.dimensions.margin_box().height;
+            children_max_width = children_max_width.max(child.dimensions.margin_box().width);
+        }
+
+        // 3. self main: height -> (specific, auto by children sum)
+        let mut height = style.value("height").unwrap_or(Value::Keyword("auto".to_string()));
+        if height.is_specific_length() {
+            self.dimensions.inner.height = height.to_px();
+        }
+        else if height.is_auto() {
+            self.dimensions.inner.height = children_sum_height;
+        }
+
+        // 4. self cross: width -> (specific, max by children)
+        if is_self_no_filled_auto {
+            self.dimensions.inner.width = children_max_width;
+            self.dimensions.inner.width = children_max_width;
+        }
+
+        // 5. fill children: width -> block (empty auto -> fill one line)
+        if is_self_no_filled_auto {
+            let underflow_content = self.dimensions.inner.width - {
+                let margin_left = style.lookup("margin-left", "margin", &zero);
+                let margin_right = style.lookup("margin-right", "margin", &zero);
+        
+                let border_left = style.lookup("border-left-width", "border-width", &zero);
+                let border_right = style.lookup("border-right-width", "border-width", &zero);
+        
+                let padding_left = style.lookup("padding-left", "padding", &zero);
+                let padding_right = style.lookup("padding-right", "padding", &zero);
+        
+                sum([
+                    &margin_left,
+                    &margin_right,
+                    &border_left,
+                    &border_right,
+                    &padding_left,
+                    &padding_right,
+                    &width,
+                ]
+                .iter()
+                .map(|v| v.to_px()))
+            };
+            self_as_container_width = Value::Length(underflow_content, Unit::Px);
+            self_as_context_constraints_width = self_as_container_width.clone();
+            for child in &mut self.children {
+                if !matches!(child.box_type, BoxType::AnonymousBlock) && child.is_width_auto() {
+                    // auto and not anonymous -> retake one line
+                    child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+                }
+            }
+        }
+
+        // 6. fixing children #[cfg(not(margin-auto))]
+        for child in &mut self.children {
+            // edge size auto by position block
+            // self.dimensions.box_offset.left; // no margin so to do nothing
+        }
+
 
     }
 
@@ -434,7 +747,7 @@ impl<'a> LayoutBox<'a> {
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
             BoxType::InlineNode(_) | BoxType::AnonymousBlock => self,
-            BoxType::BlockNode(_) => {
+            BoxType::BlockNode(_) | BoxType::InlineBlockNode(_) => {
                 // If we've just generated an anonymous block box, keep using it.
                 // Otherwise, create a new one.
                 match self.children.last().clone() {
@@ -451,79 +764,6 @@ impl<'a> LayoutBox<'a> {
     // ...
 }
 
-impl<'a> LayoutBox<'a> {
-    fn layout_measure_inline(&mut self) {
-        // calculate measure width and height never limit by context (but if work-break=break-all need to limit and split insert to new line)
-
-        // calculate position
-
-        // (no children)
-
-        // (no specific width height)
-    }
-}
-
-impl<'a> LayoutBox<'a> {
-    fn layout_anonymous_block(&mut self) {}
-
-    fn calculate_anonymous_block_width(&mut self, containing_block: Dimensions) {}
-
-    fn calculate_anonymous_block_position(&mut self, containing_block: Dimensions) {}
-
-    fn calculate_anonymous_block_height(&mut self, containing_block: Dimensions) {}
-
-    fn fill_anonymous_block_width(&mut self) {}
-}
-
-impl<'a> LayoutBox<'a> {
-    fn layout_line(&mut self, containing_block: Dimensions) {}
-
-    fn layout_line_width(&mut self, containing_block: Dimensions) {}
-
-    fn layout_line_top_left(&mut self, containing_block: Dimensions) {}
-
-    fn layout_line_children(&mut self) {}
-
-    fn layout_line_final_width(&mut self) {}
-
-    fn fill_line_height(&mut self) {}
-}
-
-impl<'a> LayoutBox<'a> {
-    fn layout_inline_run_block(&mut self, containing_block: Dimensions) {
-        self.measure_inline_run_width(containing_block);
-        self.calculate_inline_run_position(containing_block);
-        self.resolve_final_width_and_line_context(containing_block);
-    }
-
-    fn measure_inline_run_width(&mut self, containing_block: Dimensions) {
-        todo!()
-    }
-
-    fn calculate_inline_run_position(&mut self, containing_block: Dimensions) {
-        todo!()
-    }
-
-    fn resolve_final_width_and_line_context(&mut self, containing_block: Dimensions) {
-        todo!()
-    }
-
-    fn fix_top(&mut self) {
-        todo!()
-    }
-}
-
-impl<'a> LayoutBox<'a> {
-    fn layout_inline_block(&mut self, containing_block: Dimensions) {}
-
-    fn layout_inline_block_width(&mut self, containing_block: Dimensions) {}
-
-    fn layout_inline_block_position(&mut self, containing_block: Dimensions) {}
-
-    fn layout_inline_block_children(&mut self) {}
-
-    fn fill_line_block_width_and_fix_top(&mut self) {}
-}
 
 fn sum<I>(iter: I) -> f32
 where
