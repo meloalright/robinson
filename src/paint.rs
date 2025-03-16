@@ -163,7 +163,7 @@ mod tests {
     use std::io::{BufWriter, Read};
 
     #[test]
-    fn test_rasterization2() {
+    fn test_rasterization() {
         let root = html::parse(
             "<div class=\"a\">
   <div class=\"b\">
@@ -197,7 +197,7 @@ mod tests {
 
         let mut layout_tree = build_layout_tree(&styled_tree);
 
-        layout_tree.layout2(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
+        layout_tree.layout(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
         layout_tree.calc_abs();
 
         let canvas = paint(

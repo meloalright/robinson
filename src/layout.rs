@@ -207,16 +207,16 @@ impl<'a> LayoutBox<'a> {
         width.is_auto()
     }
 
-    pub fn layout2(&mut self, container_width: Value, context_constraints_width: Value) {
+    pub fn layout(&mut self, container_width: Value, context_constraints_width: Value) {
         // content-box
         match self.box_type.clone() {
-            BoxType::BlockNode(_) => self.layout_block2(container_width, context_constraints_width),
+            BoxType::BlockNode(_) => self.layout_block(container_width, context_constraints_width),
             BoxType::InlineNode(_) => {}  // TODO
             BoxType::AnonymousBlock => {} // TODO
         }
     }
 
-    fn layout_block2(&mut self, container_width: Value, context_constraints_width: Value) {
+    fn layout_block(&mut self, container_width: Value, context_constraints_width: Value) {
         self.calculate_block(container_width.clone(), context_constraints_width.clone());
     }
 
@@ -351,7 +351,7 @@ impl<'a> LayoutBox<'a> {
         let mut children_sum_height = 0f32;
         let mut children_max_width = 0f32;
         for child in &mut self.children {
-            child.layout2(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+            child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
             child.dimensions.box_offset.top = children_sum_height;
             children_sum_height += child.dimensions.margin_box().height;
             children_max_width = children_max_width.max(child.dimensions.margin_box().width);
@@ -401,7 +401,7 @@ impl<'a> LayoutBox<'a> {
             for child in &mut self.children {
                 if child.is_width_auto() && !matches!(child.box_type, BoxType::AnonymousBlock) {
                     // auto and not anonymous -> retake one line
-                    child.layout2(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+                    child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
                 }
             }
         }
@@ -538,7 +538,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_layout2() {
+    fn test_layout() {
         let root = html::parse("<div class=\"note\"><div class=\"note\"></div></div>".to_string());
         let css =
             css::parse("div.note { display: block; margin: 20px; padding: 10px; }".to_owned());
@@ -549,7 +549,7 @@ mod tests {
 
         let mut dimension = Dimensions::default();
 
-        layout_tree.layout2(Value::Length(200.0, Unit::Px), Value::Length(200.0, Unit::Px));
+        layout_tree.layout(Value::Length(200.0, Unit::Px), Value::Length(200.0, Unit::Px));
 
         println!("{:#?}", layout_tree);
 
