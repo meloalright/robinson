@@ -20,3 +20,30 @@
 * inline -> into anonymous block (build_layout_tree)
 
 * line break segment and soft wrap opportunity break into inline formatting context and bounding (layout)
+
+
+* if Text means tag
+- it can literal styled (display)
+- it can context styling
+- it children should be content string
+- (or it can contains other tag children)
+- when it display block
+  - it should create a new anonymous line inside
+    - then split text runs
+    - (or inline layout inline children tags and split)
+- when it display inline
+  - it should merge into one bubble inline formatting context and split runs
+- when it display inline-block
+  - it should create a new anonymous line inside
+    - then split text runs
+    - (or inline layout inline children tags and split)
+
+
+* if Text means string [better]
+- it can not contain any tag children
+- it can not have any children
+- it can not literal styled (display)
+- it can context styling
+- (it parent if block will have create a new anonymous line -> then layout inline children tags and split it)
+- (it parent if inline -> merge into deep bubble inline formatting context and split runss)
+- (it parent if inline-block will have create a new anonymous line -> then layout inline children tags and split it)
