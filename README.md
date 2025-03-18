@@ -38,8 +38,16 @@
     - then split text runs
     - (or inline layout inline children tags and split)
 
+* if Text means tag but macro checked (better)
+- it can not check pass any tag children
+- it can not check pass any children
+- it can literal styled but can not check passed display not inline
+- it can context styling
+- (it parent if block will have create a new anonymous line -> then layout inline children tags and split it)
+- (it parent will not be checked pass inline or measurable)
+- (it parent if inline-block will have create a new anonymous line -> then layout inline children tags and split it)
 
-* if Text means string [better]
+* if Text means string
 - it can not contain any tag children
 - it can not have any children
 - it can not literal styled (display)
