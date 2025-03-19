@@ -55,3 +55,5 @@
 - (it parent if block will have create a new anonymous line -> then layout inline children tags and split it)
 - (it parent if inline -> merge into deep bubble inline formatting context and split runss)
 - (it parent if inline-block will have create a new anonymous line -> then layout inline children tags and split it)
+
+* inline formatting context have to use index but not borrow

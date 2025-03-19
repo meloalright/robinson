@@ -71,19 +71,15 @@ pub struct LayoutBox<'a> {
     pub(crate) children: Vec<LayoutBox<'a>>,
 }
 
+#[derive(Debug, Clone)]
 pub enum InlineFormattingContextRun {
-    TextRun(),
-    Atom(),
+    // TextRun(),
+    Atom,
 }
 
-impl<'a> LayoutBox<'a> {
-    pub fn is_line_breakable() -> bool {
-        todo!()
-    }
-
-    pub fn line_break(underflow_width: f32) -> Vec<InlineFormattingContextRun> {
-        todo!()
-    }
+#[derive(Debug, Clone, Default)]
+pub struct InlineFormattingContext{
+    pub(crate) elements: Vec<InlineFormattingContextRun>
 }
 
 impl Dimensions {
@@ -126,13 +122,19 @@ pub enum BoxType<'a> {
     BlockNode(&'a StyledNode<'a>),
     InlineBlockNode(&'a StyledNode<'a>),
     InlineNode(&'a StyledNode<'a>),
-    AnonymousBlock,
+    AnonymousBlock(InlineFormattingContext),
 }
 enum Display {
     Inline,
     InlineBlock,
     Block,
     None,
+}
+
+impl<'a> LayoutBox<'a> {
+    pub fn is_segmentable(&self) -> bool {
+        false
+    }
 }
 
 impl<'a> StyledNode<'a> {
@@ -219,7 +221,7 @@ impl<'a> LayoutBox<'a> {
     fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::InlineBlockNode(node) => node,
-            BoxType::AnonymousBlock => panic!("Anonymous block box has no style node"),
+            BoxType::AnonymousBlock(_) => panic!("Anonymous block box has no style node"),
         }
     }
     // ...
@@ -236,7 +238,7 @@ impl<'a> LayoutBox<'a> {
             BoxType::BlockNode(_) => self.layout_block(container_width, context_constraints_width),
             BoxType::InlineNode(_) => self.layout_inline(container_width, context_constraints_width),  // TODO
             BoxType::InlineBlockNode(_) => self.layout_inline_block(container_width, context_constraints_width),  // TODO
-            BoxType::AnonymousBlock => self.layout_anonymous(container_width, context_constraints_width) // TODO
+            BoxType::AnonymousBlock(_) => self.layout_anonymous(container_width, context_constraints_width) // TODO
         }
     }
 
@@ -437,7 +439,7 @@ impl<'a> LayoutBox<'a> {
             self_as_container_width = Value::Length(underflow_content, Unit::Px);
             self_as_context_constraints_width = self_as_container_width.clone();
             for child in &mut self.children {
-                if !matches!(child.box_type, BoxType::AnonymousBlock) && child.is_width_auto() {
+                if !matches!(child.box_type, BoxType::AnonymousBlock(_)) && child.is_width_auto() {
                     // auto and not anonymous -> retake one line
                     child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
                 }
@@ -469,31 +471,38 @@ impl<'a> LayoutBox<'a> {
         let mut computed_lines_max_width = 0f32;
 
         let ifc_constraints_width = self_as_context_constraints_width.to_px();
+        let mut ifc_elements = vec![];
 
         for child in &mut self.children {
-            child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
-            let mut next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
 
-            if next_sum_width > ifc_constraints_width {
-                // wrap
-                computed_lines_sum_height += this_line_children_max_height;
-                computed_lines_max_width = ifc_constraints_width;
-                this_line_children_sum_width = 0f32;
-                this_line_children_max_height = 0f32;
-
-                // 5.top -> child-baseline(inline run, inline-block)
-                // todo!()
-
-                next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
+            if child.is_segmentable() {
+                todo!()
+            } else {
+                child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+                let mut next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
+    
+                if next_sum_width > ifc_constraints_width {
+                    // wrap
+                    computed_lines_sum_height += this_line_children_max_height;
+                    computed_lines_max_width = ifc_constraints_width;
+                    this_line_children_sum_width = 0f32;
+                    this_line_children_max_height = 0f32;
+    
+                    // 5.top -> child-baseline(inline run, inline-block)
+                    // todo!()
+    
+                    next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
+                }
+    
+                // 3. width -> (auto by children sum but limit by context)
+                child.dimensions.box_offset.left = this_line_children_sum_width;
+                // 4. height -> lines Σ (max by children)
+                child.dimensions.box_offset.top = computed_lines_sum_height;
+    
+                this_line_children_sum_width = next_sum_width;
+                this_line_children_max_height = this_line_children_max_height.max(child.dimensions.margin_box().height);
+                ifc_elements.push(InlineFormattingContextRun::Atom)
             }
-
-            // 3. width -> (auto by children sum but limit by context)
-            child.dimensions.box_offset.left = this_line_children_sum_width;
-            // 4. height -> lines Σ (max by children)
-            child.dimensions.box_offset.top = computed_lines_sum_height;
-
-            this_line_children_sum_width = next_sum_width;
-            this_line_children_max_height = this_line_children_max_height.max(child.dimensions.margin_box().height);
         }
 
         // final line
@@ -507,6 +516,13 @@ impl<'a> LayoutBox<'a> {
 
         drop(this_line_children_max_height);
         drop(this_line_children_sum_width);
+
+        match &mut self.box_type {
+            BoxType::AnonymousBlock(ifc) => {
+                ifc.elements = ifc_elements
+            },
+            _ => unreachable!()
+        }
     }
 
     pub fn layout_inline(&mut self, container_width: Value, context_constraints_width: Value) {
@@ -711,7 +727,7 @@ impl<'a> LayoutBox<'a> {
             self_as_container_width = Value::Length(underflow_content, Unit::Px);
             self_as_context_constraints_width = self_as_container_width.clone();
             for child in &mut self.children {
-                if !matches!(child.box_type, BoxType::AnonymousBlock) && child.is_width_auto() {
+                if !matches!(child.box_type, BoxType::AnonymousBlock(_)) && child.is_width_auto() {
                     // auto and not anonymous -> retake one line
                     child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
                 }
@@ -746,7 +762,7 @@ impl<'a> LayoutBox<'a> {
     // Where a new inline child should go.
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
-            BoxType::InlineNode(_) | BoxType::AnonymousBlock => self,
+            BoxType::InlineNode(_) | BoxType::AnonymousBlock(_) => self,
             BoxType::BlockNode(_) | BoxType::InlineBlockNode(_) => {
                 // If we've just generated an anonymous block box, keep using it.
                 // Otherwise, create a new one.
@@ -755,7 +771,7 @@ impl<'a> LayoutBox<'a> {
                         box_type: AnonymousBlock,
                         ..
                     }) => {}
-                    _ => self.children.push(LayoutBox::new(BoxType::AnonymousBlock)),
+                    _ => self.children.push(LayoutBox::new(BoxType::AnonymousBlock(Default::default()))),
                 }
                 self.children.last_mut().unwrap()
             }

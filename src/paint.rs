@@ -19,8 +19,21 @@ fn render_layout_box(list: &mut DisplayList, layout_box: &LayoutBox) {
     render_borders(list, layout_box);
     // TODO: render text
 
-    for child in &layout_box.children {
-        render_layout_box(list, child);
+    match &layout_box.box_type {
+        BoxType::AnonymousBlock(ifc) => {
+            for (i, element) in ifc.elements.iter().enumerate() {
+                match element {
+                    InlineFormattingContextRun::Atom => {
+                        render_layout_box(list, &layout_box.children[i]);
+                    }
+                }
+            }
+        },
+        _ => {
+            for child in &layout_box.children {
+                render_layout_box(list, child);
+            }
+        }
     }
 }
 
@@ -40,7 +53,7 @@ fn get_color(layout_box: &LayoutBox, name: &str) -> Option<Color> {
             Some(Value::ColorValue(color)) => Some(color),
             _ => None,
         },
-        BoxType::AnonymousBlock => None,
+        BoxType::AnonymousBlock(_) => None,
     }
 }
 
