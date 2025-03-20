@@ -23,12 +23,12 @@ fn render_layout_box(list: &mut DisplayList, layout_box: &LayoutBox) {
         BoxType::AnonymousBlock(ifc) => {
             for (i, element) in ifc.elements.iter().enumerate() {
                 match element {
-                    InlineFormattingContextRun::Atom => {
-                        render_layout_box(list, &layout_box.children[i]);
+                    InlineFormattingContextRun::Atom(index) => {
+                        render_layout_box(list, &layout_box.children[*index]);
                     }
                 }
             }
-        },
+        }
         _ => {
             for child in &layout_box.children {
                 render_layout_box(list, child);
@@ -49,7 +49,9 @@ fn render_background(list: &mut DisplayList, layout_box: &LayoutBox) {
 // Return the specified color for CSS property `name`, or None if no color was specified.
 fn get_color(layout_box: &LayoutBox, name: &str) -> Option<Color> {
     match layout_box.box_type {
-        BoxType::BlockNode(style) | BoxType::InlineNode(style) | BoxType::InlineBlockNode(style) => match style.value(name) {
+        BoxType::BlockNode(style)
+        | BoxType::InlineNode(style)
+        | BoxType::InlineBlockNode(style) => match style.value(name) {
             Some(Value::ColorValue(color)) => Some(color),
             _ => None,
         },
@@ -210,7 +212,10 @@ mod tests {
 
         let mut layout_tree = build_layout_tree(&styled_tree);
 
-        layout_tree.layout(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
+        layout_tree.layout(
+            Value::Length(800.0, Unit::Px),
+            Value::Length(800.0, Unit::Px),
+        );
         layout_tree.calc_abs();
 
         let canvas = paint(
@@ -232,7 +237,6 @@ mod tests {
         let mut file = BufWriter::new(File::create("output-block.png").unwrap());
         image::DynamicImage::ImageRgba8(img).write_to(&mut file, image::ImageFormat::Png);
     }
-
 
     #[test]
     fn test_inline_rasterization() {
@@ -303,7 +307,10 @@ mod tests {
 
         let mut layout_tree = build_layout_tree(&styled_tree);
 
-        layout_tree.layout(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
+        layout_tree.layout(
+            Value::Length(800.0, Unit::Px),
+            Value::Length(800.0, Unit::Px),
+        );
         layout_tree.calc_abs();
 
         let canvas = paint(
@@ -325,8 +332,6 @@ mod tests {
         let mut file = BufWriter::new(File::create("output-inline.png").unwrap());
         image::DynamicImage::ImageRgba8(img).write_to(&mut file, image::ImageFormat::Png);
     }
-
-
 
     #[test]
     fn test_inline_block_rasterization() {
@@ -444,7 +449,10 @@ mod tests {
 
         let mut layout_tree = build_layout_tree(&styled_tree);
 
-        layout_tree.layout(Value::Length(800.0, Unit::Px), Value::Length(800.0, Unit::Px));
+        layout_tree.layout(
+            Value::Length(800.0, Unit::Px),
+            Value::Length(800.0, Unit::Px),
+        );
         layout_tree.calc_abs();
 
         let canvas = paint(

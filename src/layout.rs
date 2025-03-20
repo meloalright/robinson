@@ -47,7 +47,6 @@ impl Dimensions {
     }
 }
 
-
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Rect {
     pub(crate) x: f32,
@@ -74,12 +73,12 @@ pub struct LayoutBox<'a> {
 #[derive(Debug, Clone)]
 pub enum InlineFormattingContextRun {
     // TextRun(),
-    Atom,
+    Atom(usize),
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct InlineFormattingContext{
-    pub(crate) elements: Vec<InlineFormattingContextRun>
+pub struct InlineFormattingContext {
+    pub(crate) elements: Vec<InlineFormattingContextRun>,
 }
 
 impl Dimensions {
@@ -220,7 +219,9 @@ impl<'a> LayoutBox<'a> {
 
     fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
-            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::InlineBlockNode(node) => node,
+            BoxType::BlockNode(node)
+            | BoxType::InlineNode(node)
+            | BoxType::InlineBlockNode(node) => node,
             BoxType::AnonymousBlock(_) => panic!("Anonymous block box has no style node"),
         }
     }
@@ -228,7 +229,9 @@ impl<'a> LayoutBox<'a> {
 
     pub fn is_width_auto(&self) -> bool {
         let style = self.get_style_node();
-        let width = style.value("width").unwrap_or(Value::Keyword("auto".to_string()));
+        let width = style
+            .value("width")
+            .unwrap_or(Value::Keyword("auto".to_string()));
         width.is_auto()
     }
 
@@ -236,9 +239,15 @@ impl<'a> LayoutBox<'a> {
         // content-box
         match self.box_type.clone() {
             BoxType::BlockNode(_) => self.layout_block(container_width, context_constraints_width),
-            BoxType::InlineNode(_) => self.layout_inline(container_width, context_constraints_width),  // TODO
-            BoxType::InlineBlockNode(_) => self.layout_inline_block(container_width, context_constraints_width),  // TODO
-            BoxType::AnonymousBlock(_) => self.layout_anonymous(container_width, context_constraints_width) // TODO
+            BoxType::InlineNode(_) => {
+                self.layout_inline(container_width, context_constraints_width)
+            } // TODO
+            BoxType::InlineBlockNode(_) => {
+                self.layout_inline_block(container_width, context_constraints_width)
+            } // TODO
+            BoxType::AnonymousBlock(_) => {
+                self.layout_anonymous(container_width, context_constraints_width)
+            } // TODO
         }
     }
 
@@ -250,7 +259,9 @@ impl<'a> LayoutBox<'a> {
         // 1. width -> (specific, auto take one line from container, empty auto)
 
         let style = self.get_style_node();
-        let mut width = style.value("width").unwrap_or(Value::Keyword("auto".to_string()));
+        let mut width = style
+            .value("width")
+            .unwrap_or(Value::Keyword("auto".to_string()));
 
         let mut self_as_container_width = Value::Keyword("auto".to_string());
         let mut self_as_context_constraints_width = context_constraints_width.clone();
@@ -264,13 +275,13 @@ impl<'a> LayoutBox<'a> {
             let underflow_content = specific_width - {
                 let mut margin_left = style.lookup("margin-left", "margin", &zero);
                 let mut margin_right = style.lookup("margin-right", "margin", &zero);
-        
+
                 let border_left = style.lookup("border-left-width", "border-width", &zero);
                 let border_right = style.lookup("border-right-width", "border-width", &zero);
-        
+
                 let padding_left = style.lookup("padding-left", "padding", &zero);
                 let padding_right = style.lookup("padding-right", "padding", &zero);
-        
+
                 sum([
                     &margin_left,
                     &margin_right,
@@ -294,13 +305,13 @@ impl<'a> LayoutBox<'a> {
                 let underflow_content = specific_container_width - {
                     let mut margin_left = style.lookup("margin-left", "margin", &zero);
                     let mut margin_right = style.lookup("margin-right", "margin", &zero);
-            
+
                     let border_left = style.lookup("border-left-width", "border-width", &zero);
                     let border_right = style.lookup("border-right-width", "border-width", &zero);
-            
+
                     let padding_left = style.lookup("padding-left", "padding", &zero);
                     let padding_right = style.lookup("padding-right", "padding", &zero);
-            
+
                     sum([
                         &margin_left,
                         &margin_right,
@@ -321,13 +332,13 @@ impl<'a> LayoutBox<'a> {
                 let underflow_constraint = context_constraints_width.to_px() - {
                     let mut margin_left = style.lookup("margin-left", "margin", &zero);
                     let mut margin_right = style.lookup("margin-right", "margin", &zero);
-            
+
                     let border_left = style.lookup("border-left-width", "border-width", &zero);
                     let border_right = style.lookup("border-right-width", "border-width", &zero);
-            
+
                     let padding_left = style.lookup("padding-left", "padding", &zero);
                     let padding_right = style.lookup("padding-right", "padding", &zero);
-            
+
                     sum([
                         &margin_left,
                         &margin_right,
@@ -352,57 +363,64 @@ impl<'a> LayoutBox<'a> {
 
             let margin_left = style.lookup("margin-left", "margin", &zero);
             let margin_right = style.lookup("margin-right", "margin", &zero);
-    
+
             let border_left = style.lookup("border-left-width", "border-width", &zero);
             let border_right = style.lookup("border-right-width", "border-width", &zero);
-    
+
             let padding_left = style.lookup("padding-left", "padding", &zero);
             let padding_right = style.lookup("padding-right", "padding", &zero);
-    
+
             let d = &mut self.dimensions;
-    
+
             d.padding.left = padding_left.to_px();
             d.padding.right = padding_right.to_px();
-    
+
             d.border.left = border_left.to_px();
             d.border.right = border_right.to_px();
-    
+
             d.margin.left = margin_left.to_px();
             d.margin.right = margin_right.to_px();
             // If margin-top or margin-bottom is `auto`, the used value is zero.
             d.margin.top = style.lookup("margin-top", "margin", &zero).to_px();
             d.margin.bottom = style.lookup("margin-bottom", "margin", &zero).to_px();
-    
+
             d.border.top = style
                 .lookup("border-top-width", "border-width", &zero)
                 .to_px();
             d.border.bottom = style
                 .lookup("border-bottom-width", "border-width", &zero)
                 .to_px();
-    
+
             d.padding.top = style.lookup("padding-top", "padding", &zero).to_px();
             d.padding.bottom = style.lookup("padding-bottom", "padding", &zero).to_px();
-            self.dimensions.inner.left = self.dimensions.margin.left + self.dimensions.border.left + self.dimensions.padding.left;
-            self.dimensions.inner.top = self.dimensions.margin.top + self.dimensions.border.top + self.dimensions.padding.top;
+            self.dimensions.inner.left = self.dimensions.margin.left
+                + self.dimensions.border.left
+                + self.dimensions.padding.left;
+            self.dimensions.inner.top = self.dimensions.margin.top
+                + self.dimensions.border.top
+                + self.dimensions.padding.top;
         }
-        
 
         // 2. recursive -> vertical(block, anonymous block)
         let mut children_sum_height = 0f32;
         let mut children_max_width = 0f32;
         for child in &mut self.children {
-            child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+            child.layout(
+                self_as_container_width.clone(),
+                self_as_context_constraints_width.clone(),
+            );
             child.dimensions.box_offset.top = children_sum_height;
             children_sum_height += child.dimensions.margin_box().height;
             children_max_width = children_max_width.max(child.dimensions.margin_box().width);
         }
 
         // 3. self main: height -> (specific, auto by children sum)
-        let mut height = style.value("height").unwrap_or(Value::Keyword("auto".to_string()));
+        let mut height = style
+            .value("height")
+            .unwrap_or(Value::Keyword("auto".to_string()));
         if height.is_specific_length() {
             self.dimensions.inner.height = height.to_px();
-        }
-        else if height.is_auto() {
+        } else if height.is_auto() {
             self.dimensions.inner.height = children_sum_height;
         }
 
@@ -417,13 +435,13 @@ impl<'a> LayoutBox<'a> {
             let underflow_content = self.dimensions.inner.width - {
                 let margin_left = style.lookup("margin-left", "margin", &zero);
                 let margin_right = style.lookup("margin-right", "margin", &zero);
-        
+
                 let border_left = style.lookup("border-left-width", "border-width", &zero);
                 let border_right = style.lookup("border-right-width", "border-width", &zero);
-        
+
                 let padding_left = style.lookup("padding-left", "padding", &zero);
                 let padding_right = style.lookup("padding-right", "padding", &zero);
-        
+
                 sum([
                     &margin_left,
                     &margin_right,
@@ -441,7 +459,10 @@ impl<'a> LayoutBox<'a> {
             for child in &mut self.children {
                 if !matches!(child.box_type, BoxType::AnonymousBlock(_)) && child.is_width_auto() {
                     // auto and not anonymous -> retake one line
-                    child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+                    child.layout(
+                        self_as_container_width.clone(),
+                        self_as_context_constraints_width.clone(),
+                    );
                 }
             }
         }
@@ -451,9 +472,7 @@ impl<'a> LayoutBox<'a> {
             // edge size auto by position block
             // self.dimensions.box_offset.left; // no margin so to do nothing
         }
-
     }
-
 
     fn layout_anonymous(&mut self, container_width: Value, context_constraints_width: Value) {
         // 1. width -> (empty auto)
@@ -473,35 +492,40 @@ impl<'a> LayoutBox<'a> {
         let ifc_constraints_width = self_as_context_constraints_width.to_px();
         let mut ifc_elements = vec![];
 
-        for child in &mut self.children {
-
+        for (i, child) in &mut self.children.iter_mut().enumerate() {
             if child.is_segmentable() {
                 todo!()
             } else {
-                child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
-                let mut next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
-    
+                child.layout(
+                    self_as_container_width.clone(),
+                    self_as_context_constraints_width.clone(),
+                );
+                let mut next_sum_width =
+                    this_line_children_sum_width + child.dimensions.margin_box().width;
+
                 if next_sum_width > ifc_constraints_width {
                     // wrap
                     computed_lines_sum_height += this_line_children_max_height;
                     computed_lines_max_width = ifc_constraints_width;
                     this_line_children_sum_width = 0f32;
                     this_line_children_max_height = 0f32;
-    
+
                     // 5.top -> child-baseline(inline run, inline-block)
                     // todo!()
-    
-                    next_sum_width = this_line_children_sum_width + child.dimensions.margin_box().width;
+
+                    next_sum_width =
+                        this_line_children_sum_width + child.dimensions.margin_box().width;
                 }
-    
+
                 // 3. width -> (auto by children sum but limit by context)
                 child.dimensions.box_offset.left = this_line_children_sum_width;
                 // 4. height -> lines Σ (max by children)
                 child.dimensions.box_offset.top = computed_lines_sum_height;
-    
+
                 this_line_children_sum_width = next_sum_width;
-                this_line_children_max_height = this_line_children_max_height.max(child.dimensions.margin_box().height);
-                ifc_elements.push(InlineFormattingContextRun::Atom)
+                this_line_children_max_height =
+                    this_line_children_max_height.max(child.dimensions.margin_box().height);
+                ifc_elements.push(InlineFormattingContextRun::Atom(i))
             }
         }
 
@@ -518,10 +542,8 @@ impl<'a> LayoutBox<'a> {
         drop(this_line_children_sum_width);
 
         match &mut self.box_type {
-            BoxType::AnonymousBlock(ifc) => {
-                ifc.elements = ifc_elements
-            },
-            _ => unreachable!()
+            BoxType::AnonymousBlock(ifc) => ifc.elements = ifc_elements,
+            _ => unreachable!(),
         }
     }
 
@@ -534,11 +556,17 @@ impl<'a> LayoutBox<'a> {
         self.dimensions.inner.height = height.to_px();
     }
 
-    pub fn layout_inline_block(&mut self, container_width: Value, context_constraints_width: Value) {
+    pub fn layout_inline_block(
+        &mut self,
+        container_width: Value,
+        context_constraints_width: Value,
+    ) {
         // 1. measurable (width calc from container, height calc from container)
 
         let style = self.get_style_node();
-        let mut width = style.value("width").unwrap_or(Value::Keyword("auto".to_string()));
+        let mut width = style
+            .value("width")
+            .unwrap_or(Value::Keyword("auto".to_string()));
 
         let mut self_as_container_width = Value::Keyword("auto".to_string());
         let mut self_as_context_constraints_width = context_constraints_width.clone();
@@ -552,13 +580,13 @@ impl<'a> LayoutBox<'a> {
             let underflow_content = specific_width - {
                 let mut margin_left = style.lookup("margin-left", "margin", &zero);
                 let mut margin_right = style.lookup("margin-right", "margin", &zero);
-        
+
                 let border_left = style.lookup("border-left-width", "border-width", &zero);
                 let border_right = style.lookup("border-right-width", "border-width", &zero);
-        
+
                 let padding_left = style.lookup("padding-left", "padding", &zero);
                 let padding_right = style.lookup("padding-right", "padding", &zero);
-        
+
                 sum([
                     &margin_left,
                     &margin_right,
@@ -582,13 +610,13 @@ impl<'a> LayoutBox<'a> {
                 let underflow_content = specific_container_width - {
                     let mut margin_left = style.lookup("margin-left", "margin", &zero);
                     let mut margin_right = style.lookup("margin-right", "margin", &zero);
-            
+
                     let border_left = style.lookup("border-left-width", "border-width", &zero);
                     let border_right = style.lookup("border-right-width", "border-width", &zero);
-            
+
                     let padding_left = style.lookup("padding-left", "padding", &zero);
                     let padding_right = style.lookup("padding-right", "padding", &zero);
-            
+
                     sum([
                         &margin_left,
                         &margin_right,
@@ -609,13 +637,13 @@ impl<'a> LayoutBox<'a> {
                 let underflow_constraint = context_constraints_width.to_px() - {
                     let mut margin_left = style.lookup("margin-left", "margin", &zero);
                     let mut margin_right = style.lookup("margin-right", "margin", &zero);
-            
+
                     let border_left = style.lookup("border-left-width", "border-width", &zero);
                     let border_right = style.lookup("border-right-width", "border-width", &zero);
-            
+
                     let padding_left = style.lookup("padding-left", "padding", &zero);
                     let padding_right = style.lookup("padding-right", "padding", &zero);
-            
+
                     sum([
                         &margin_left,
                         &margin_right,
@@ -640,57 +668,64 @@ impl<'a> LayoutBox<'a> {
 
             let margin_left = style.lookup("margin-left", "margin", &zero);
             let margin_right = style.lookup("margin-right", "margin", &zero);
-    
+
             let border_left = style.lookup("border-left-width", "border-width", &zero);
             let border_right = style.lookup("border-right-width", "border-width", &zero);
-    
+
             let padding_left = style.lookup("padding-left", "padding", &zero);
             let padding_right = style.lookup("padding-right", "padding", &zero);
-    
+
             let d = &mut self.dimensions;
-    
+
             d.padding.left = padding_left.to_px();
             d.padding.right = padding_right.to_px();
-    
+
             d.border.left = border_left.to_px();
             d.border.right = border_right.to_px();
-    
+
             d.margin.left = margin_left.to_px();
             d.margin.right = margin_right.to_px();
             // If margin-top or margin-bottom is `auto`, the used value is zero.
             d.margin.top = style.lookup("margin-top", "margin", &zero).to_px();
             d.margin.bottom = style.lookup("margin-bottom", "margin", &zero).to_px();
-    
+
             d.border.top = style
                 .lookup("border-top-width", "border-width", &zero)
                 .to_px();
             d.border.bottom = style
                 .lookup("border-bottom-width", "border-width", &zero)
                 .to_px();
-    
+
             d.padding.top = style.lookup("padding-top", "padding", &zero).to_px();
             d.padding.bottom = style.lookup("padding-bottom", "padding", &zero).to_px();
-            self.dimensions.inner.left = self.dimensions.margin.left + self.dimensions.border.left + self.dimensions.padding.left;
-            self.dimensions.inner.top = self.dimensions.margin.top + self.dimensions.border.top + self.dimensions.padding.top;
+            self.dimensions.inner.left = self.dimensions.margin.left
+                + self.dimensions.border.left
+                + self.dimensions.padding.left;
+            self.dimensions.inner.top = self.dimensions.margin.top
+                + self.dimensions.border.top
+                + self.dimensions.padding.top;
         }
-        
 
         // 2. recursive -> vertical(block, anonymous block)
         let mut children_sum_height = 0f32;
         let mut children_max_width = 0f32;
         for child in &mut self.children {
-            child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+            child.layout(
+                self_as_container_width.clone(),
+                self_as_context_constraints_width.clone(),
+            );
             child.dimensions.box_offset.top = children_sum_height;
             children_sum_height += child.dimensions.margin_box().height;
             children_max_width = children_max_width.max(child.dimensions.margin_box().width);
         }
 
         // 3. self main: height -> (specific, auto by children sum)
-        let mut height = style.value("height").unwrap_or(Value::Keyword("auto".to_string()));
+        let mut height = style
+            .value("height")
+            .unwrap_or(Value::Keyword("auto".to_string()));
         if height.is_specific_length() {
             self.dimensions.inner.height = height.to_px();
-        }
-        else if height.is_auto() {
+        } else if height.is_auto() {
             self.dimensions.inner.height = children_sum_height;
         }
 
@@ -705,13 +740,13 @@ impl<'a> LayoutBox<'a> {
             let underflow_content = self.dimensions.inner.width - {
                 let margin_left = style.lookup("margin-left", "margin", &zero);
                 let margin_right = style.lookup("margin-right", "margin", &zero);
-        
+
                 let border_left = style.lookup("border-left-width", "border-width", &zero);
                 let border_right = style.lookup("border-right-width", "border-width", &zero);
-        
+
                 let padding_left = style.lookup("padding-left", "padding", &zero);
                 let padding_right = style.lookup("padding-right", "padding", &zero);
-        
+
                 sum([
                     &margin_left,
                     &margin_right,
@@ -729,7 +764,10 @@ impl<'a> LayoutBox<'a> {
             for child in &mut self.children {
                 if !matches!(child.box_type, BoxType::AnonymousBlock(_)) && child.is_width_auto() {
                     // auto and not anonymous -> retake one line
-                    child.layout(self_as_container_width.clone(), self_as_context_constraints_width.clone());
+                    child.layout(
+                        self_as_container_width.clone(),
+                        self_as_context_constraints_width.clone(),
+                    );
                 }
             }
         }
@@ -739,8 +777,6 @@ impl<'a> LayoutBox<'a> {
             // edge size auto by position block
             // self.dimensions.box_offset.left; // no margin so to do nothing
         }
-
-
     }
 
     pub fn calc_abs(&mut self) {
@@ -771,7 +807,9 @@ impl<'a> LayoutBox<'a> {
                         box_type: AnonymousBlock,
                         ..
                     }) => {}
-                    _ => self.children.push(LayoutBox::new(BoxType::AnonymousBlock(Default::default()))),
+                    _ => self
+                        .children
+                        .push(LayoutBox::new(BoxType::AnonymousBlock(Default::default()))),
                 }
                 self.children.last_mut().unwrap()
             }
@@ -779,7 +817,6 @@ impl<'a> LayoutBox<'a> {
     }
     // ...
 }
-
 
 fn sum<I>(iter: I) -> f32
 where
@@ -805,7 +842,10 @@ mod tests {
 
         let mut dimension = Dimensions::default();
 
-        layout_tree.layout(Value::Length(200.0, Unit::Px), Value::Length(200.0, Unit::Px));
+        layout_tree.layout(
+            Value::Length(200.0, Unit::Px),
+            Value::Length(200.0, Unit::Px),
+        );
 
         println!("{:#?}", layout_tree);
 
